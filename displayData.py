@@ -1,9 +1,8 @@
 #!/usr/bin/python3
 # Author: Tom Daniels
-# Assumption: The Price table has data for at least every day between the first
-#             and the last Transaction date for a given ticker.
+# File: displayData.py
 
-# TODO: Ensure the database exists
+# TODO: Remove the jump from 0 on the cost_basis line
 
 #############
 ## Imports ##
@@ -13,6 +12,7 @@ import bokeh.models
 import bokeh.plotting
 import bokeh.io
 import datetime
+import os
 import sqlite3
 
 
@@ -92,9 +92,12 @@ def update():
     price_data = cursor.execute(("SELECT * " 
                                  "FROM Prices "
                                  "JOIN Tickers ON Prices.TickerId = Tickers.Id "
-                                 "WHERE Tickers.Ticker = ? AND Date > ? "
+                                 "WHERE Tickers.Ticker = ? AND Date > (? - 86400)"
                                  "ORDER BY Date ASC;"), [ticker, trans_data[0][EPOCH]]).fetchall()
     con.close
+
+    # Confirm we have price data for all the transaction dates
+    assert (price_data[0][EPOCH] < trans_data[0][EPOCH] and trans_data[-1][EPOCH] < price_data[-1][EPOCH]), "Error, price history doesn't cover all transaction dates"
 
     # Set up variables for the calculations
     dividends = 0.0            # Keep track of the amount of dividends we've earned
@@ -157,8 +160,17 @@ def update():
         total_invested[Y].append(average_cost * shares + dividends)
 
     # Set the data for the graph
-    source.data = { 'x_axis': [total_invested[X], cost_basis[X]],
-                    'y_axis': [total_invested[Y], cost_basis[Y]] }
+    invested_source.data = { 'x_axis': total_invested[X],
+                             'y_axis': total_invested[Y] }
+    basis_source.data = { 'x_axis': cost_basis[X],
+                          'y_axis': cost_basis[Y] }
+
+    # Color the cost basis line based on performance
+    if (total_invested[Y][-1] > cost_basis[Y][-1]):
+        basis_renderer.glyph.line_color = 'red'
+    else:
+        basis_renderer.glyph.line_color = 'green'
+
 
 ##########
 ## Main ##
@@ -167,6 +179,7 @@ def update():
 #
 ### Get the data from the database
 #
+assert (os.path.exists("tda.sqlite")), "Error, tda.sqlite doesn't exist! Have you run importData.py?"
 con = sqlite3.connect("tda.sqlite")
 cursor = con.cursor()
 
@@ -198,11 +211,13 @@ ticker_selection = bokeh.models.Select(title='Symbol', value=tickers[0], options
 ticker_selection.on_change('value', ticker_change)
 
 # Holds the data to be graphed
-source = bokeh.models.ColumnDataSource(data=dict(x_axis=[[], []], y_axis=[[], []]))
+invested_source = bokeh.models.ColumnDataSource(data=dict(x_axis=[], y_axis=[]))
+basis_source = bokeh.models.ColumnDataSource(data=dict(x_axis=[], y_axis=[]))
 
 # Create plot, label and format the axes, and configure the hover tool
-plot = bokeh.plotting.figure(plot_width=1000, plot_height=300, x_axis_type="datetime")
-plot.multi_line('x_axis', 'y_axis', source=source)
+plot = bokeh.plotting.figure(plot_width=1000, plot_height=300, x_axis_type='datetime')
+plot.line('x_axis', 'y_axis', source=invested_source)
+basis_renderer = plot.line('x_axis', 'y_axis', source=basis_source)
 plot.xaxis.axis_label = 'Date'
 plot.yaxis.axis_label = 'Dollars'
 plot.yaxis[0].formatter = bokeh.models.NumeralTickFormatter(format='$0.00')
