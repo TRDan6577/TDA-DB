@@ -110,7 +110,7 @@ class TDApi:
         @param self (object) - instance of the current class
         @param e (Exception) - the Exception that was raised
         @param error_message (str) - a string describing the error
-        @return (None) - this function either sends with exit() or raises an error
+        @return (None) - this function either ends with exit() or raises an error
         """
 
         # Set up logging to log the error

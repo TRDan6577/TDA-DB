@@ -2,8 +2,6 @@
 # Author: Tom Daniels
 # File: displayData.py
 
-# TODO: Remove the jump from 0 on the cost_basis line
-
 #############
 ## Imports ##
 #############
@@ -151,8 +149,9 @@ def update():
                 trans_time = -1
 
         # Update the current value of our asset
-        cost_basis[X].append(datetime.datetime.fromtimestamp(day[EPOCH]))
-        cost_basis[Y].append(shares * day[CLOSE] + dividends)
+        if (shares):
+            cost_basis[X].append(datetime.datetime.fromtimestamp(day[EPOCH]))
+            cost_basis[Y].append(shares * day[CLOSE] + dividends)
 
     # Extend the amount invested all the way to the end of the graph
     if (price_data):

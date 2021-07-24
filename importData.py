@@ -51,6 +51,26 @@ def namer(name):
     return name + '.gz'
 
 
+def catch_error(tel, e, error_message):
+    """
+    Purpose: Logs the error, then eithe raises it or sends it to telegram if
+             telegram error reporting is enabled.
+    @param tel (Object) - the telegram object
+    @param e (Exception) - the Exception that was raised
+    @param error_message (str) - a string describing the error
+    @return (None) - this function either ends with exit() or rasies an error
+    """
+
+    # Send the error notification or fail
+    if (tel):
+        tel.send_error_message(error_message
+    else:
+        # Set up logging to log the error
+        logger = logging.getLogger()
+        logger.error(error_message)
+        raise e
+
+
 ###########################
 ## The main() Attraction ##
 ###########################
@@ -73,9 +93,12 @@ def main():
     config = configparser.ConfigParser()
     config.read('config.ini')
 
-    # Set up messaging via Telegram
-    logger.debug("Creating Telegram object")
-    tel = telegram.Telegram(config['Telegram']['bot_id'], config['Telegram']['chat_id'])
+    # Set up messaging via Telegram, if enabled
+    if (config['Telegram']['enabled'] == 'yes'):
+        logger.debug("Creating Telegram object")
+        tel = telegram.Telegram(config['Telegram']['bot_id'], config['Telegram']['chat_id'])
+    else:
+        tel = None
 
     # Connect to the TD Ameritrade API
     logger.debug("Connecting to the TD Api and getting account positions")
@@ -87,7 +110,7 @@ def main():
         con    = sqlite3.connect(db_name)
         cursor = con.cursor()
     except Exception as e:
-        tel.send_error_message("Unable to connect to the sqlite db file. Error: {0}".format(repr(e)))
+        catch_error(tel, e, "Unable to connect to the sqlite db file. Error: {0}".format(repr(e)))
 
     # If the database is empty, create the tables
     try:
@@ -97,9 +120,9 @@ def main():
                 logger.warning("Database appears empty. Creating it...")
                 tda_db.create_database(con, cursor)
             except Exception as e:
-                tel.send_error_message("Unable to create the database. Error: {0}".format(repr(e)))
+                catch_error(tel, e, "Unable to create the database. Error: {0}".format(repr(e)))
     except Exception as e:
-        tel.send_error_message("Unable to look for tables in the database. Error: {0}".format(repr(e)))
+        catch_error(tel, e, "Unable to look for tables in the database. Error: {0}".format(repr(e)))
 
     # Keep track of all the transactions we made and our current positions
     # so we can update the price history
@@ -114,7 +137,7 @@ def main():
         try:
             tda_db.insert_account(con, cursor, account['account_id'])
         except Exception as e:
-            tel.send_error_message("Unable to insert account. Error: {0}".format(repr(e)))
+            catch_error(tel, e, "Unable to insert account. Error: {0}".format(repr(e)))
 
         # Record the amount of cash in the account for later
         cash = account['cash_value']
@@ -123,7 +146,7 @@ def main():
         try:
             tda_db.clear_positions(con, cursor, account['account_id'])
         except Exception as e:
-            tel.send_error_message("Unable to clear the positions table. Error: {0}".format(repr(e)))
+            catch_error(tel, e, "Unable to clear the positions table. Error: {0}".format(repr(e)))
         
         # Iterate through each position in the account adding new
         # transactions and prices to the DB as well as updating our
@@ -145,13 +168,13 @@ def main():
             try:
                 tda_db.insert_ticker(con, cursor, position['instrument']['symbol'])
             except Exception as e:
-                tel.send_error_message("Unable to insert ticker. Error: {0}".format(repr(e)))
+                catch_error(tel, e, "Unable to insert ticker. Error: {0}".format(repr(e)))
 
             # Insert our position into the database
             try:
                 tda_db.insert_position(con, cursor, position, account['account_id'])
             except Exception as e:
-                tel.send_error_message("Unable to update position. Error: {0}".format(repr(e)))
+                catch_error(tel, e, "Unable to update position. Error: {0}".format(repr(e)))
 
 
         # Insert the amount of cash for the account, faking the position dict.
@@ -164,7 +187,7 @@ def main():
                                          'symbol':    '$CASH$' } }
             tda_db.insert_position(con, cursor, position, account['account_id'])
         except Exception as e:
-            tel.send_error_message("Unable to update cash values. Error: {0}".format(repr(e)))
+            catch_error(tel, e, "Unable to update cash values. Error: {0}".format(repr(e)))
 
         # Get all the symbols of our current positions. We'll
         # use this to update the price history for each symbol below
@@ -196,7 +219,7 @@ def main():
             transactions += tda_db.insert_transactions(con, cursor, td, account['account_id'], start_date=start_date, end_date=end_date)
 
         except Exception as e:
-            tel.send_error_message("Unable to update account transactions. Error: {0}".format(repr(e)))
+            catch_error(tel, e, "Unable to update account transactions. Error: {0}".format(repr(e)))
 
 
     # Update the price history for all symbols in the transactions
@@ -220,7 +243,7 @@ def main():
             cursor.execute(query, [symbol])
             tda_db.update_price_history(con, cursor, td, symbol=symbol, end_date=utility.from_epoch(cursor.fetchall()[0][0]))
     except Exception as e:
-        tel.send_error_message("Unable to update price history for the recent transactions. Error: {0}".format(repr(e)))
+        catch_error(tel, e, "Unable to update price history for the recent transactions. Error: {0}".format(repr(e)))
 
     # Update the price history for our current positions
     try:
@@ -230,7 +253,7 @@ def main():
                 continue
             tda_db.update_price_history(con, cursor, td, symbol)
     except Exception as e:
-        tel.send_error_message("Unable to update price history for our current positions. Error: {0}".format(repr(e)))
+        catch_error(tel, e, "Unable to update price history for our current positions. Error: {0}".format(repr(e)))
 
 
     logger.debug("Closing DB connection and exiting")

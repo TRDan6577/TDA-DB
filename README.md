@@ -6,12 +6,16 @@ TDA-DB has two python scripts (and a few helper files) to pull down data about y
 
 **Disclaimer**: This product is in no way sponsored, endorsed, or affiliated with TD Ameritrade. The authors take no responsibility for any damage that might arise due to use of this code.
 
+## Features
+* Stores transactions and price history in a sqlite database
+* Graphs cost basis for stocks in the database
+* Reports errors through a [Telegram bot](https://core.telegram.org/bots)
+
 ## Why you should avoid using this
 This section left intentionally blank, as this code is flawless
 
 ## Actual reasons to avoid
 * Doesn't support all transaction types - The only data I have access to are transactions I've made on my own account so (for example), the database and code don't support options transactions
-* You don't have or want to use telegram for error reporting. This is a stupid thing that will be fixed in [Planned](#planned)
 * ?? I can't think of anything else. If you're interested in the historic cost basis of your account as a whole or for particular tickers in your account and you have a TD Ameritrade brokerage account, this can show you that data.
 
 ## Prerequisites
@@ -19,7 +23,6 @@ TDA-DB requires the following:
 * Python3
 * A brokerage account with TD Ameritrade. Why did you care to continue reading the README without one of these?
 * An OAuth2 token and API key to access your TD Ameritrade account. You can create these on the [developer website](https://developer.tdameritrade.com)
-* A [Telegram bot](https://core.telegram.org/bots) and chat to report errors to
 * The python packages in the requirements.txt file to be installed (namely [`tda-api`](https://github.com/alexgolec/tda-api) and [`bokeh`](https://github.com/bokeh/bokeh)). This can be done with `pip3 install -r requirements.txt`
 
 ## Configuration
@@ -37,4 +40,3 @@ As with most projects on github, here's the planned features/bug fixes section t
 * `displayData.py` - Add an option to select all stocks to see how the total cost basis of the account changed over time
 * `displayData.py` - Look into a bug that sometime pops up on graphs for my IRA account
 * `importData.py` - Add support for options
-* All - make the telegram error reporting optional
