@@ -35,8 +35,6 @@ There are two main files TDA-DB has:
 
 ## Planned
 As with most projects on github, here's the planned features/bug fixes section that will slowly devolve into a list of features that the code lacks and will never have implemented:
-* `displayData.py` - Make the transaction occur at the actual transaction time and not on the following day
 * `displayData.py` - Implment a hover tool. It should include the date, dollar gain/loss, percent gain/loss, total dollar amount invested, and the current value of the investment in the ticker
-* `displayData.py` - Add an option to select all stocks to see how the total cost basis of the account changed over time
 * `displayData.py` - Look into a bug that sometime pops up on graphs for my IRA account
 * `importData.py` - Add support for options

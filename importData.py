@@ -63,7 +63,7 @@ def catch_error(tel, e, error_message):
 
     # Send the error notification or fail
     if (tel):
-        tel.send_error_message(error_message
+        tel.send_error_message(error_message)
     else:
         # Set up logging to log the error
         logger = logging.getLogger()

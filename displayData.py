@@ -30,54 +30,16 @@ Y = 1
 ###############
 ## Functions ##
 ###############
-def ticker_change(attrname, old, new):
+def calc_cost_basis(ticker, account):
     """
-    Purpose: Called when a ticker is selected from the dropdown menu.
-             Simply updates the graph with the new data
-    @param attrname (str) - name of the changed attribute
-    @param old (str) - the previous selected ticker
-    @param new (str) - the newly selected ticker
+    Purpose: Retrieves the cost_basis and total invested for a given ticker
+             in an account
+    @param ticker (string) - the stock ticker
+    @account (string) - the account for which to calculate the cost basis
+    @return (tuple) - a tuple containing a list of dates and total account values
+            for the given stock, and a list of dates and the total amount invested
+            in the given stock
     """
-    update()
-
-def account_change(attrname, old, new):
-    """
-    Purpose: Called when an account is selected from the dropdown menu.
-             Adjusts the available account options AND ticker options.
-    @param attrname (str) - name of the changed attribute
-    @param old (str) - the previous selected account
-    @param new (str) - the newly selected account
-    """
-    account = account_selection.value
-
-    # Update the available tickers for that account
-    con = sqlite3.connect("tda.sqlite")
-    cursor = con.cursor()
-    tickers = cursor.execute(("SELECT DISTINCT Ticker "
-                              "FROM Tickers "
-                              "JOIN Transactions ON Transactions.TickerId = Tickers.Id "
-                              "WHERE Transactions.AccountId = ? "
-                              "  AND Ticker != '$CASH$';"), [account]).fetchall()
-    con.close()
-    assert len(tickers) != 0, "No available tickers in the database for account {0}".format(account)
-    tickers = [ticker[0] for ticker in tickers]
-
-    # Update the list of tickers to select from
-    ticker_selection.options = tickers
-    ticker_selection.value = tickers[0]
-
-    # Update the graph
-    update()
-
-
-def update():
-    """
-    Purpose: Gathers the price and transaction data, then draws the graph
-    """
-
-    # Get the current selected values
-    ticker = ticker_selection.value
-    account = account_selection.value
 
     # Get the data from the database
     con = sqlite3.connect("tda.sqlite")
@@ -156,8 +118,125 @@ def update():
     # Extend the amount invested all the way to the end of the graph
     if (price_data):
         total_invested[X].append(datetime.datetime.fromtimestamp(price_data[-1][EPOCH]))
-        total_invested[Y].append(average_cost * shares + dividends)
+        total_invested[Y].append(average_cost * shares)
 
+    return (total_invested, cost_basis)
+
+
+def ticker_change(attrname, old, new):
+    """
+    Purpose: Called when a ticker is selected from the dropdown menu.
+             Simply updates the graph with the new data
+    @param attrname (str) - name of the changed attribute
+    @param old (str) - the previous selected ticker
+    @param new (str) - the newly selected ticker
+    """
+    update()
+
+def account_change(attrname, old, new):
+    """
+    Purpose: Called when an account is selected from the dropdown menu.
+             Adjusts the available account options AND ticker options.
+    @param attrname (str) - name of the changed attribute
+    @param old (str) - the previous selected account
+    @param new (str) - the newly selected account
+    """
+    account = account_selection.value
+
+    # Update the available tickers for that account
+    con = sqlite3.connect("tda.sqlite")
+    cursor = con.cursor()
+    tickers = cursor.execute(("SELECT DISTINCT Ticker "
+                              "FROM Tickers "
+                              "JOIN Transactions ON Transactions.TickerId = Tickers.Id "
+                              "WHERE Transactions.AccountId = ? "
+                              "  AND Ticker != '$CASH$';"), [account]).fetchall()
+    con.close()
+    assert len(tickers) != 0, "No available tickers in the database for account {0}".format(account)
+    tickers = [ticker[0] for ticker in tickers]
+    tickers.append('Total')
+
+    # Update the list of tickers to select from
+    ticker_selection.options = tickers
+    ticker_selection.value = tickers[0]
+
+    # Update the graph
+    update()
+
+
+def update():
+    """
+    Purpose: Gathers the price and transaction data, then draws the graph
+    """
+
+    # Get the current selected values
+    ticker = ticker_selection.value
+    account = account_selection.value
+
+    # Calculate the cost basis
+    if (ticker == 'Total'):
+
+        # Get all the data from all tickers
+        total_invested_dict = {}
+        cost_basis_dict = {}
+        for t in tickers:
+
+            # Ignore the fake ticker
+            if (t == 'Total'):
+                continue
+
+            total_invested, cost_basis = calc_cost_basis(t, account)
+
+            # For the ticker, note the date and by how much we invested
+            # on that date
+            running_total = 0
+            for i in range(0, len(total_invested[X])):
+                if (total_invested[Y][i] != running_total):
+                    if (total_invested[X][i] in total_invested_dict.keys()):
+                        total_invested_dict[total_invested[X][i]] += (total_invested[Y][i] - running_total)
+                    else:
+                        total_invested_dict[total_invested[X][i]] = (total_invested[Y][i] - running_total)
+                    running_total = total_invested[Y][i]
+
+            # For the ticker, note each date and the value of our investment at that time
+            for i in range(0, len(cost_basis[X])):
+                if (cost_basis[X][i] in cost_basis_dict.keys()):
+                    cost_basis_dict[cost_basis[X][i]] += cost_basis[Y][i]
+                else:
+                    cost_basis_dict[cost_basis[X][i]] = cost_basis[Y][i]
+
+        # For each date in the dictionary, sort the dates and
+        # note the price at each date
+        total_invested = [[], []]
+        total_invested_temp = list(total_invested_dict.keys())
+        total_invested_temp.sort()
+        running_total = 0
+        for date in total_invested_temp:
+            # Extend the graph line to the next increase in
+            # total invested
+            if (running_total):
+                total_invested[X].append(date)
+                total_invested[Y].append(total_invested[Y][-1])
+            running_total += total_invested_dict[date]
+            total_invested[X].append(date)
+            total_invested[Y].append(running_total)
+
+        # For each date in the dictionary, sort the dates and
+        # note the price at each date
+        cost_basis = [[], []]
+        cost_basis_temp = list(cost_basis_dict.keys())
+        cost_basis_temp.sort()
+        for date in cost_basis_temp:
+            cost_basis[X].append(date)
+            cost_basis[Y].append(cost_basis_dict[date])
+
+        # Extend the total invested to the end of the graph
+        total_invested[X].append(cost_basis[X][-1])
+        total_invested[Y].append(running_total)
+
+    else:
+        total_invested, cost_basis = calc_cost_basis(ticker, account)
+    
     # Set the data for the graph
     invested_source.data = { 'x_axis': total_invested[X],
                              'y_axis': total_invested[Y] }
@@ -195,6 +274,7 @@ tickers = cursor.execute(("SELECT DISTINCT Ticker "
                           "  AND Ticker != '$CASH$';"), [accounts[0]]).fetchall()
 assert len(tickers) != 0, "No available tickers in the database for account {0}".format(accounts[0])
 tickers = [ticker[0] for ticker in tickers]
+tickers.append('Total')
 
 con.close()
 
