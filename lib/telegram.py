@@ -149,7 +149,7 @@ class Telegram:
         return None
 
 
-    def get_updates():
+    def get_updates(self):
         """
         Purpose: Retrieves any updates to the chat
         @param   self (Object) - reference to the current instance of the class
@@ -165,7 +165,7 @@ class Telegram:
         return json.loads(response.text)
 
 
-    def unpin_all_chat_messages():
+    def unpin_all_chat_messages(self):
         """
         Purpose: Unpins all the pinned chat messages
         @param   self (Object) - reference to the current instance of the class
