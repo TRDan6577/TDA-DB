@@ -236,12 +236,29 @@ def update():
 
     else:
         total_invested, cost_basis = calc_cost_basis(ticker, account)
+
+    # Calculate % gain/loss and $ gain/loss for the hover tool
+    daily_invested = []
+    cost_basis_dollar = []
+    cost_basis_percent = []
+    invested_index = 0
+    invested_max_index = len(total_invested[X]) - 1
+    for i in range(0, len(cost_basis[X])):
+        while (invested_index < invested_max_index - 1 and
+               total_invested[X][invested_index+1] <= cost_basis[X][i]):
+            invested_index += 1
+        daily_invested.append(total_invested[Y][invested_index])  # Record the amount we have invested on this date
+        cost_basis_dollar.append(cost_basis[Y][i] - daily_invested[-1])  # Record the cost basis on this date
+        cost_basis_percent.append((cost_basis_dollar[-1] * 100) / daily_invested[-1]) 
     
     # Set the data for the graph
     invested_source.data = { 'x_axis': total_invested[X],
                              'y_axis': total_invested[Y] }
-    basis_source.data = { 'x_axis': cost_basis[X],
-                          'y_axis': cost_basis[Y] }
+    basis_source.data = { 'x_axis':        cost_basis[X],
+                          'y_axis':        cost_basis[Y],
+                          'invested':      daily_invested,
+                          'basis_dollar':  cost_basis_dollar,
+                          'basis_percent': cost_basis_percent }
 
     # Color the cost basis line based on performance
     if (total_invested[Y][-1] > cost_basis[Y][-1]):
@@ -291,15 +308,36 @@ ticker_selection.on_change('value', ticker_change)
 
 # Holds the data to be graphed
 invested_source = bokeh.models.ColumnDataSource(data=dict(x_axis=[], y_axis=[]))
-basis_source = bokeh.models.ColumnDataSource(data=dict(x_axis=[], y_axis=[]))
+basis_source = bokeh.models.ColumnDataSource(data=dict(x_axis=[], y_axis=[], invested=[], basis_dollar=[], basis_percent=[]))
 
 # Create plot, label and format the axes, and configure the hover tool
 plot = bokeh.plotting.figure(plot_width=1000, plot_height=300, x_axis_type='datetime')
-plot.line('x_axis', 'y_axis', source=invested_source)
-basis_renderer = plot.line('x_axis', 'y_axis', source=basis_source)
+plot.line('x_axis', 'y_axis', line_width=1.5, source=invested_source)
+basis_renderer = plot.line('x_axis', 'y_axis', line_width=1.5,  source=basis_source)
 plot.xaxis.axis_label = 'Date'
 plot.yaxis.axis_label = 'Dollars'
 plot.yaxis[0].formatter = bokeh.models.NumeralTickFormatter(format='$0.00')
+
+# Add the hover tool to the graph
+hover_tool = bokeh.models.HoverTool(
+    tooltips = [
+        ('Date',           '$x{%F}'),
+        ('Current Value',  '$@{y_axis}{%0.2f}'),
+        ('Invested',       '$@{invested}{%0.2f}'),
+        ('Cost Basis ($)', '$@{basis_dollar}{%0.2f}'),
+        ('Cost Basis (%)', '@basis_percent')],
+    mode = 'vline'
+)
+hover_tool.formatters = {
+    '$x':              'datetime',
+    '@{y_axis}':       'printf',
+    '@{invested}':     'printf',
+    '@{basis_dollar}': 'printf'
+}
+plot.add_tools(hover_tool)
+
+# Only show the hover tool over the cost basis
+plot.hover.renderers = [basis_renderer]
 
 # Graph the data on the plot
 update()
