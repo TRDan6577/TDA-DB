@@ -4,11 +4,22 @@ For storing all of your GME transactions and other bad investments on the [TD Am
 ## Purpose
 TDA-DB has two python scripts (and a few helper files) to pull down data about your account from the [TDA API](https://developer.tdameritrade.com/apis), set up your data in a sqlite database, and to display the cost basis of your account in a web UI.
 
+![Example](/img/example.png)
+
+The above is an example of the graph generated from the SQLite database.
+* The box pointing to a spot on the graph is part of a hover tool that displays some information about the account at a specific point in time. The hover tool can be disabled
+* The blue line is the amount invested
+* The green line is the current value of the position (it turns red if the liquidation value falls below the amount invested)
+* The top left dropdown box is the account selector and the top right is the ticker selector
+
 **Disclaimer**: This product is in no way sponsored, endorsed, or affiliated with TD Ameritrade. The authors take no responsibility for any damage that might arise due to use of this code.
 
 ## Features
 * Stores transactions and price history in a sqlite database
 * Graphs cost basis for stocks in the database
+* Supports multiple accounts
+* Supports multiple tickers in each account
+* Colors cost basis line green or red based on the current cost basis. Green for positive, red for negative
 * Reports errors through a [Telegram bot](https://core.telegram.org/bots)
 
 ## Why you should avoid using this
@@ -35,6 +46,4 @@ There are two main files TDA-DB has:
 
 ## Planned
 As with most projects on github, here's the planned features/bug fixes section that will slowly devolve into a list of features that the code lacks and will never have implemented:
-* `README.md` - Add images of the tool
-* All - include the license
 * `importData.py` - Add support for options

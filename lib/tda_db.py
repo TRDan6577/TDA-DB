@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 # Author: Tom Daniels
+# File: tda_db.py
+# License: Mozilla Public License v2.0. See LICENSE file included with repository for more details
 
 #############
 ## Imports ##

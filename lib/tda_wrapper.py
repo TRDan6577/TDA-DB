@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 # Author: Tom Daniels
 # Requires logging to be set up
+# File: tda_wrapper.py
+# License: Mozilla Public License v2.0. See LICENSE file included with repository for more details
 
 #############
 ## Imports ##
