@@ -35,5 +35,6 @@ There are two main files TDA-DB has:
 
 ## Planned
 As with most projects on github, here's the planned features/bug fixes section that will slowly devolve into a list of features that the code lacks and will never have implemented:
-* `displayData.py` - Look into a bug that sometime pops up on graphs for my IRA account
+* `README.md` - Add images of the tool
+* All - include the license
 * `importData.py` - Add support for options

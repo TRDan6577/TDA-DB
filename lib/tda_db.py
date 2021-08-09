@@ -383,9 +383,9 @@ def insert_transactions(con, cursor, td, account_id, symbol=None, start_date=Non
     logger.debug("Entering insert_transaction. Parameters are:\n\taccount_id: {0}\n\tstart_date: {1}\n\tend_date: {2}".format(account_id, start_date, end_date))
 
     # Transaction type validation
-    IGNORED_TRANSACTIONS = ['RECEIVE_AND_DELIVER', 'JOURNAL', 'CASH_RECEIPT']
-    KNOWN_TRANSACTIONS   = ['TRADE', 'ELECTRONIC_FUND', 'DIVIDEND_OR_INTEREST']
-    KNOWN_ASSET_TYPES    = ['EQUITY']
+    IGNORED_TRANSACTIONS = ['JOURNAL', 'CASH_RECEIPT']
+    KNOWN_TRANSACTIONS   = ['TRADE', 'ELECTRONIC_FUND', 'DIVIDEND_OR_INTEREST', 'RECEIVE_AND_DELIVER']
+    KNOWN_ASSET_TYPES    = ['EQUITY', 'CASH_EQUIVALENT']
 
     # Get the transactions from the TD API
     transactions = td.get_transactions(account_id, symbol=symbol, start_date=start_date, end_date=end_date)
@@ -418,6 +418,8 @@ def insert_transactions(con, cursor, td, account_id, symbol=None, start_date=Non
             assert (transaction['transactionItem']['instrument']['assetType'] in KNOWN_ASSET_TYPES), "Encountered unknown asset type '{0}' in transaction id {1}".format(transaction['transactionItem']['instrument']['assetType'], transaction['transactionId'])
 
         # Prepare the transaction(s) for insertion
+
+        # Dividends
         if (transaction['type'] == 'DIVIDEND_OR_INTEREST'):
             if (transaction['description'] == 'FREE BALANCE INTEREST ADJUSTMENT'):
                 symbol = '$CASH$'
@@ -430,12 +432,30 @@ def insert_transactions(con, cursor, td, account_id, symbol=None, start_date=Non
                                    int((dateutil.parser.parse(transaction['transactionDate'])).timestamp()),
                                    0, 0, transaction['netAmount'], transaction['description']))
 
+        # Money deposit
         elif (transaction['type'] == 'ELECTRONIC_FUND'):
             insertion_data.append((transaction['transactionId'], account_id,
                                    get_ticker_id(con, cursor, '$CASH$'),
                                    int((dateutil.parser.parse(transaction['transactionDate'])).timestamp()),
                                    0, 0, transaction['netAmount'], transaction['description']))
 
+        # Transfer of securities and options
+        elif (transaction['type'] == 'RECEIVE_AND_DELIVER'):
+            # Money deposit from another account
+            if (transaction['transactionItem']['instrument']['assetType'] == 'CASH_EQUIVALENT'):
+                insertion_data.append((transaction['transactionId'], account_id,
+                                       get_ticker_id(con, cursor, '$CASH$'),
+                                       int((dateutil.parser.parse(transaction['transactionDate'])).timestamp()),
+                                       0, 0, transaction['transactionItem']['amount'], transaction['description']))
+            # Security or option from another account
+            else:
+                insertion_data.append((transaction['transactionId'], account_id,
+                                       get_ticker_id(con, cursor, transaction['transactionItem']['instrument']['symbol']),
+                                       int((dateutil.parser.parse(transaction['transactionDate'])).timestamp()),
+                                       transaction['transactionItem']['amount'], 0.0,
+                                       transaction['netAmount'], transaction['description']))
+
+        # Buy or Sell
         elif (transaction['type'] == 'TRADE'):
             # Add the symbol if it doesn't already exist
             insert_ticker(con, cursor, transaction['transactionItem']['instrument']['symbol'])

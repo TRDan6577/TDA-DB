@@ -57,7 +57,7 @@ def calc_cost_basis(ticker, account):
     con.close
 
     # Confirm we have price data for all the transaction dates
-    assert (price_data[0][EPOCH] < trans_data[0][EPOCH] and trans_data[-1][EPOCH] < price_data[-1][EPOCH]), "Error, price history doesn't cover all transaction dates"
+    assert (price_data[0][EPOCH] < trans_data[0][EPOCH] and trans_data[-1][EPOCH] < (price_data[-1][EPOCH] + 86400)), "Error, price history doesn't cover all transaction dates"
 
     # Set up variables for the calculations
     dividends = 0.0            # Keep track of the amount of dividends we've earned
@@ -70,11 +70,10 @@ def calc_cost_basis(ticker, account):
 
     # Go through each day
     for day in price_data:
-
         # Did we have any transactions in the past 24 hours?
         if (trans_time != -1):
             trans_time = trans_data[transaction_index][EPOCH]
-        price_time = day[EPOCH]
+        price_time = day[EPOCH] + 82740  # Set the time of day to 11:59 PM rather than 1 AM
 
         # If so, go through all transactions in the past 24 hours
         # and adjust the number of shares, average cost, and dividends accordingly
@@ -95,6 +94,17 @@ def calc_cost_basis(ticker, account):
             if (new_shares == 0):  # Dividend transaction
                 assert ('DIVIDEND' in trans_data[transaction_index][4]), 'Encountered a transaction without any changes in shares but a change in total'
                 dividends += trans_data[transaction_index][TOTAL]
+            elif ((shares + new_shares) == 0):  # Sold off a position
+                average_cost = 0.0
+                shares = 0
+            elif ('TRANSFER OF SECURITY' in trans_data[transaction_index][DESCRIPTION]):  # Option or security transferred from another account
+                # In this situtation, it's impossible to know the true cost basis.
+                # Simply assume the asset was purchased on the day it was transferred
+                if (average_cost == 0.0):
+                    average_cost = day[CLOSE]
+                else:
+                    average_cost = (average_cost * shares + day[CLOSE]) / (shares + new_shares)
+                shares += new_shares
             else:  # A typical buy/sell
                 average_cost = (average_cost * shares - trans_data[transaction_index][TOTAL]) / (shares + new_shares)
                 shares += new_shares
@@ -111,7 +121,7 @@ def calc_cost_basis(ticker, account):
                 trans_time = -1
 
         # Update the current value of our asset
-        if (shares):
+        if (shares or len(cost_basis[X]) > 0):
             cost_basis[X].append(datetime.datetime.fromtimestamp(day[EPOCH]))
             cost_basis[Y].append(shares * day[CLOSE] + dividends)
 
@@ -170,7 +180,8 @@ def update():
     """
 
     # Get the current selected values
-    ticker = ticker_selection.value
+    ticker  = ticker_selection.value
+    tickers = ticker_selection.options
     account = account_selection.value
 
     # Calculate the cost basis
@@ -248,8 +259,12 @@ def update():
                total_invested[X][invested_index+1] <= cost_basis[X][i]):
             invested_index += 1
         daily_invested.append(total_invested[Y][invested_index])  # Record the amount we have invested on this date
-        cost_basis_dollar.append(cost_basis[Y][i] - daily_invested[-1])  # Record the cost basis on this date
-        cost_basis_percent.append((cost_basis_dollar[-1] * 100) / daily_invested[-1]) 
+        if (daily_invested[-1] != 0):  # Avoid divide by zero when position is sold off completely
+            cost_basis_dollar.append(cost_basis[Y][i] - daily_invested[-1])  # Record the cost basis on this date
+            cost_basis_percent.append((cost_basis_dollar[-1] * 100) / daily_invested[-1]) 
+        else:
+            cost_basis_dollar.append(0)
+            cost_basis_percent.append(0)
     
     # Set the data for the graph
     invested_source.data = { 'x_axis': total_invested[X],
@@ -321,7 +336,7 @@ plot.yaxis[0].formatter = bokeh.models.NumeralTickFormatter(format='$0.00')
 # Add the hover tool to the graph
 hover_tool = bokeh.models.HoverTool(
     tooltips = [
-        ('Date',           '$x{%F}'),
+        ('Date',           '@x_axis{%F}'),
         ('Current Value',  '$@{y_axis}{%0.2f}'),
         ('Invested',       '$@{invested}{%0.2f}'),
         ('Cost Basis ($)', '$@{basis_dollar}{%0.2f}'),
@@ -329,7 +344,7 @@ hover_tool = bokeh.models.HoverTool(
     mode = 'vline'
 )
 hover_tool.formatters = {
-    '$x':              'datetime',
+    '@x_axis':         'datetime',
     '@{y_axis}':       'printf',
     '@{invested}':     'printf',
     '@{basis_dollar}': 'printf'
