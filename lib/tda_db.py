@@ -278,7 +278,14 @@ def update_price_history(con, cursor, td, symbol, start_date=None, end_date=None
                      "ORDER BY Date ASC "
                      "LIMIT 1;")
             cursor.execute(query, [symbol])
-            last_entry_db = cursor.fetchall()[0][0]
+            last_entry_db = cursor.fetchall()
+
+            # In some cases, we don't yet have a transactionId that we've imported so don't import price data yet
+            # Otherwise, get the earliest transaction date
+            if (len(last_entry_db) == 0 or len(last_entry_db[0]) == 0):
+                logger.debug("No transactions for '{0}'. Not updating price data yet".format(symbol))
+                return None
+            last_entry_db = last_entry_db[0][0]
         else:
             last_entry_db = price_history_db[0][0] + 86400  # the start date should be 1 day after the last in the DB
         logger.debug("Retrieving prices for {0} starting from {1}".format(symbol, utility.from_epoch(last_entry_db)))
@@ -401,6 +408,10 @@ def insert_transactions(con, cursor, td, account_id, symbol=None, start_date=Non
     insertion_data = []
     new_symbols    = []
     for transaction in transactions:
+
+        if ('transactionId' not in transaction.keys()):
+            logger.warning("Ignored a transaction without a transaction ID. These usually get added by TD later and will be automatically imported")
+            continue
 
         logger.debug("Working on transactions id {0} of type {1}".format(transaction['transactionId'], transaction['type']))
         

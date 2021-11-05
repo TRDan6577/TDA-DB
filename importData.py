@@ -93,7 +93,7 @@ def main():
 
     # Read config file
     config = configparser.ConfigParser()
-    config.read('config.ini')
+    config.read(os.path.join(script_dir, 'config.ini'))
 
     # Set up messaging via Telegram, if enabled
     if (config['Telegram']['enabled'] == 'yes'):
